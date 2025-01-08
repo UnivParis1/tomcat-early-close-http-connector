@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -71,5 +72,49 @@ public class EarlySessionsUnloadManager extends StandardManager {
             }
         }
         return super.file();
+    }
+
+
+    /****************************************************************************************/
+    /* adding here another helpful feature */
+
+    protected int maxActiveSessionsGoal = -1;
+
+    /**
+     * If you have too many sessions, you may memory overflow. 
+     * This setting will expire old sessions to keep sessions memory usage low.
+     * -1 is no limit
+     */
+    public void setMaxActiveSessionsGoal(int max) {
+        maxActiveSessionsGoal = max;
+    }
+    
+
+    public void processExpires() {
+        super.processExpires();
+        if (maxActiveSessionsGoal >= 0) {
+            var nb = getActiveSessions();
+            if (nb > maxActiveSessionsGoal) {
+                expireNbOldSessions(nb - maxActiveSessionsGoal);
+            }
+        }
+    }
+
+    private void expireNbOldSessions(int nbToRemove) {
+        var time = sessions.values().stream()
+            .mapToLong(Session::getLastAccessedTimeInternal).sorted()
+            // we want the nbToRemove-th element in the array
+            .skip(nbToRemove).findFirst()
+            .orElse(0);
+        if (time == 0) {
+            log.error("internal error expireNbOldSessions");
+            return;
+        }
+        log.info("To achieve maxActiveSessionsGoal (" + maxActiveSessionsGoal + ") for " + getContext().getBaseName() + ", we will expire sessions older than " + new Date(time) + " (" + nbToRemove + " sessions)");
+        for (Session session : findSessions()) {
+            if (session.getLastAccessedTimeInternal() < time) {
+                session.expire();
+            }
+        }
     }
 }
