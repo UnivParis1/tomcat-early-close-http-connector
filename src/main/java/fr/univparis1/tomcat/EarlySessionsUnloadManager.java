@@ -31,6 +31,9 @@ public class EarlySessionsUnloadManager extends StandardManager {
     // redo StandardManager.unload(), but do NOT expire sessions
     public void early_unload() throws IOException {
         var file = file();
+        if (file == null) { // NB: it occurs if pathname is empty string
+            return;
+        }
        
         try (FileOutputStream fos = new FileOutputStream(file.getAbsolutePath());
                 BufferedOutputStream bos = new BufferedOutputStream(fos);
